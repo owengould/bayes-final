@@ -1,0 +1,102 @@
+---
+title: "modeling"
+author: "Andy Chestovich"
+date: "2026-05-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+d <- read.csv("/Users/andy/Downloads/Bayesian_Data/NHANES_Final_Adults_Cleaned.csv")
+
+## rename all variables to lowercase 
+names(d) <- tolower(names(d))
+```
+
+
+```{r}
+## histogram of `blood_pressure`
+## distribution is right-skewed, few outliers, fairly smooth
+hist(d$blood_pressure, xlab = "Blood Pressure", main = "Histogram of Blood Pressure")
+
+## side-by-side boxplots of `blood_pressure` vs. `sex`
+## sexes are centered roughly in the same area with similar spread
+## high number of outliers (above) in each group
+boxplot(blood_pressure ~ gender_label, data = d, xlab = "Sex", ylab = "Blood Pressure")
+
+## side-by-side boxplots of `blood_pressure` vs. `sex`
+## similar results for smoker/non-smoker
+boxplot(blood_pressure ~ smoker_label, data = d, xlab = "Smoker", ylab = "Blood Pressure")
+
+## scatterplot of `blood_pressure` vs. `age`
+## age is truncated at 20 and 80 (participants had to be 18+, difficulty in finding adults over 80?)
+## might be a slight positive association between the two, but blood pressure is all over the place at 80
+plot(d$age, d$blood_pressure, xlab = "Age", ylab = "Blood Pressure")
+
+
+## side-by-side boxplots of `blood_pressure` vs. `education_level`
+boxplot(blood_pressure ~ education_label, data = d)
+
+## pairwise correlation plots for numeric variables
+## does not seem to be evidence of much collinearity, except for `weight_kg` and `bmi` (by definition)
+pairs(d[,c("age", "blood_pressure", "weight_kg", "bmi")])
+
+## what variables could be missing? income (education our best proxy), exercise (bmi our best proxy)
+
+```
+```{r}
+library(rethinking)
+library(dplyr)
+library(tidyr)
+```
+
+```{r}
+d <- d %>% mutate(gender = ifelse(gender == 2, 0, 1)) %>% 
+  mutate(education_label = factor(education_label))
+
+d <- d %>% drop_na()
+```
+
+
+```{r}
+basic_regularized <- ulam(
+    alist(
+        blood_pressure ~ dnorm(mu, sigma),
+        mu <- b0 + b1*gender + b2*smoker_status + b3*age + b4*age*gender + b5 *age *smoker_status,
+        b0 ~ dnorm(0, 20),
+        b1 ~ dnorm(0, 1), 
+        b2 ~ dnorm(0, 1), 
+        b3 ~ dnorm(0, 1), 
+        b4 ~ dnorm(0, 1), 
+        b5 ~ dnorm(0, 1),
+        sigma ~ dexp(1)
+), data = d, iter = 4000, log_lik = TRUE)
+
+```
+
+```{r}
+basic_informative <- ulam(
+    alist(
+        blood_pressure ~ dnorm(mu, sigma),
+        mu <- b0 + b1*gender_label + b2*smoker_status + b3*age + b4*age*gender_label + b5 *age *smoker_status,
+        b0 ~ dnorm(0, 20),
+        b1 ~ dnorm(0, 1), 
+        b2 ~ dnorm(0, 1), 
+        b3 ~ dnorm(.1, .3), 
+        b4 ~ dnorm(-.1, .3), 
+        b5 ~ dnorm(0, 1),
+        sigma ~ dexp(1)
+), data = d, chains = 4, cores = 4, log_lik = TRUE)
+
+```
+
+```{r}
+precis(basic_regularized)
+```
+```{r}
+precis(basic_informative)
+```
+
