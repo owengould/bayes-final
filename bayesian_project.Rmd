@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-d <- read.csv("/Users/andy/Downloads/Bayesian_Data/NHANES_Final_Adults_Cleaned.csv")
+d <- read.csv("data/NHANES_Final_Adults_Cleaned.csv")
 
 ## rename all variables to lowercase 
 names(d) <- tolower(names(d))
@@ -47,6 +47,7 @@ pairs(d[,c("age", "blood_pressure", "weight_kg", "bmi")])
 ## what variables could be missing? income (education our best proxy), exercise (bmi our best proxy)
 
 ```
+
 ```{r}
 library(rethinking)
 library(dplyr)
@@ -55,17 +56,33 @@ library(tidyr)
 
 ```{r}
 d <- d %>% mutate(gender = ifelse(gender == 2, 0, 1)) %>% 
-  mutate(education_label = factor(education_label))
+  mutate(education_label = factor(education_label),
+         smoker_label = as.factor(smoker_label),
+         std_bmi = standardize(bmi))
 
 d <- d %>% drop_na()
 ```
+
+```{r}
+no_int <- ulam(
+    alist(
+        blood_pressure ~ dnorm(mu, sigma),
+        mu <- b0 + b1*gender + b2*smoker_status + b3*age,
+        b0 ~ dnorm(0, 20),
+        b1 ~ dnorm(0, 1), 
+        b2 ~ dnorm(0, 1), 
+        b3 ~ dnorm(0, 1), 
+        sigma ~ dexp(1)
+), data = d, chains = 4, cores = 4, iter = 2000, warmup = 1000, log_lik = TRUE)
+```
+
 
 
 ```{r}
 basic_regularized <- ulam(
     alist(
         blood_pressure ~ dnorm(mu, sigma),
-        mu <- b0 + b1*gender + b2*smoker_status + b3*age + b4*age*gender + b5 *age *smoker_status,
+        mu <- b0 + b1*gender + b2*smoker_status + b3*age + b4*age*gender + b5*age*smoker_status,
         b0 ~ dnorm(0, 20),
         b1 ~ dnorm(0, 1), 
         b2 ~ dnorm(0, 1), 
@@ -73,7 +90,7 @@ basic_regularized <- ulam(
         b4 ~ dnorm(0, 1), 
         b5 ~ dnorm(0, 1),
         sigma ~ dexp(1)
-), data = d, iter = 4000, log_lik = TRUE)
+), data = d, chains = 4, cores = 4, iter = 2000, warmup = 1000, log_lik = TRUE)
 
 ```
 
@@ -81,22 +98,74 @@ basic_regularized <- ulam(
 basic_informative <- ulam(
     alist(
         blood_pressure ~ dnorm(mu, sigma),
-        mu <- b0 + b1*gender_label + b2*smoker_status + b3*age + b4*age*gender_label + b5 *age *smoker_status,
+        mu <- b0 + b1*gender + b2*smoker_status + b3*age + b4*age*gender + b5*age*smoker_status 
+              + b6*bmi*smoker_status,
         b0 ~ dnorm(0, 20),
         b1 ~ dnorm(0, 1), 
         b2 ~ dnorm(0, 1), 
-        b3 ~ dnorm(.1, .3), 
+        b3 ~ dnorm(5, 2.5), 
         b4 ~ dnorm(-.1, .3), 
         b5 ~ dnorm(0, 1),
+        b6 ~ dnorm(0, 1),
         sigma ~ dexp(1)
-), data = d, chains = 4, cores = 4, log_lik = TRUE)
+), data = d, chains = 4, cores = 4, iter = 2000, warmup = 1000, log_lik = TRUE)
 
+```
+
+```{r}
+complex_regularized <- ulam(
+    alist(
+        blood_pressure ~ dnorm(mu, sigma),
+        mu <- b0 + b1*gender + b2*smoker_status + b3*age + b4*age*gender + b5*age*smoker_status 
+              + b6*bmi*smoker_status + b7*std_bmi + b8*sleep_hours,
+        b0 ~ dnorm(0, 20),
+        b1 ~ dnorm(0, 1), 
+        b2 ~ dnorm(0, 1), 
+        b3 ~ dnorm(0, 1), 
+        b4 ~ dnorm(0, 1), 
+        b5 ~ dnorm(0, 1),
+        b6 ~ dnorm(0, 1),
+        b7 ~ dnorm(0, 1),
+        b8 ~ dnorm(0, 1)
+        sigma ~ dexp(1)
+), data = d, chains = 4, cores = 4, iter = 2000, warmup = 1000, log_lik = TRUE)
+```
+
+
+```{r}
+complex_informative <- ulam(
+    alist(
+        blood_pressure ~ dnorm(mu, sigma),
+        mu <- b0 + b1*gender + b2*smoker_status + b3*age + b4*age*gender + b5*age*smoker_status 
+              + b6*bmi*smoker_status + b7*std_bmi + b8*sleep_hours,
+        b0 ~ dnorm(0, 20),
+        b1 ~ dnorm(0, 1), 
+        b2 ~ dnorm(0, 1), 
+        b3 ~ dnorm(5, 2.5), 
+        b4 ~ dnorm(-.1, .3), 
+        b5 ~ dnorm(0, 1),
+        b6 ~ dnorm(0, 1),
+        b7 ~ dnorm(0, 1),
+        b8 ~ dnorm(0, 1)
+        sigma ~ dexp(1)
+), data = d, chains = 4, cores = 4, iter = 2000, warmup = 1000, log_lik = TRUE)
+```
+
+
+```{r}
+precis(no_int)
 ```
 
 ```{r}
 precis(basic_regularized)
 ```
+
 ```{r}
 precis(basic_informative)
 ```
+
+```{r}
+compare(basic_informative, basic_regularized, no_int)
+```
+
 
