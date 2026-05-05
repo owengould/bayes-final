@@ -59,7 +59,8 @@ d <- d %>% mutate(gender = ifelse(gender == 2, 0, 1),
                   smoker_status = ifelse(smoker_status == 2, 0, 1)) %>% 
   mutate(education_label = factor(education_label),
          smoker_label = as.factor(smoker_label),
-         std_bmi = standardize(bmi))
+         std_bmi = standardize(bmi),
+         age = age - 18)
 
 d <- d %>% drop_na()
 ```
@@ -125,7 +126,7 @@ complex_regularized <- ulam(
         b5 ~ dnorm(0, 1),
         b6 ~ dnorm(0, 1),
         b7 ~ dnorm(0, 1),
-        b8 ~ dnorm(0, 1)
+        b8 ~ dnorm(0, 1),
         sigma ~ dexp(1)
 ), data = d, chains = 4, cores = 4, iter = 2000, warmup = 1000, log_lik = TRUE)
 ```
@@ -145,7 +146,7 @@ complex_informative <- ulam(
         b5 ~ dnorm(0, 1),
         b6 ~ dnorm(0, 1),
         b7 ~ dnorm(0, 1),
-        b8 ~ dnorm(0, 1)
+        b8 ~ dnorm(0, 1),
         sigma ~ dexp(1)
 ), data = d, chains = 4, cores = 4, iter = 2000, warmup = 1000, log_lik = TRUE)
 ```
@@ -164,7 +165,17 @@ precis(basic_informative)
 ```
 
 ```{r}
-compare(basic_informative, basic_regularized, no_int)
+precis(complex_regularized)
+```
+
+```{r}
+precis(complex_informative)
+```
+
+
+
+```{r}
+compare(basic_informative, basic_regularized, no_int, complex_regularized, complex_informative)
 ```
 
 
